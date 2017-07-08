@@ -62,6 +62,61 @@ func downloadFromSoundCloud(url string){
 	fmt.Println("Download finished!")
 }
 
+func getTrackID(url string) string {
+	escapedURL := url2.QueryEscape(url)
+	fmt.Println(url)
+	fmt.Println(escapedURL)
+	apiURL := fmt.Sprintf("https://api.soundcloud.com/resolve.json?url=%s&client_id=%s", escapedURL, CLIENT_ID)
+	fmt.Println(apiURL)
+	resp, err := http.Get(apiURL)
+	handleError(err)
+	body, err := ioutil.ReadAll(resp.Body)
+	handleError(err)
+
+	fmt.Printf(string(body))
+
+	if len(body) == 0 {
+		panic("Length of JSON is 0\n")
+	} else {
+		var response map[string]interface{}
+		err = json.Unmarshal([]byte(body), &response)
+		handleError(err)
+
+		// convert id (float64) to string
+		return fmt.Sprintf("%.f", response["id"].(float64))
+	}
+}
+
+func getTrackURL(trackId string) string {
+	// create url
+	url := fmt.Sprintf("https://api.soundcloud.com/i1/tracks/%s/streams/?client_id=%s&app_version=%s", trackId, CLIENT_ID, APP_VERSION)
+
+	// make request
+	resp, err := http.Get(url)
+	handleError(err)
+	body, err := ioutil.ReadAll(resp.Body)
+	handleError(err)
+
+	if len(body) == 0 {
+		panic("Length of JSON is 0\n")
+	} else {
+		// convert response body to map
+		var response map[string]interface{}
+		err = json.Unmarshal([]byte(body), &response)
+		handleError(err)
+
+		return response[TRACK_URL_KEY].(string)
+	}
+}
+
+func downloadFileFrom(url string) (*grab.Response, error) {
+	client := grab.NewClient()
+	req, err := grab.NewRequest("output.mp3", url)
+
+	resp := client.Do(req)
+	return resp, err
+}
+
 func showDownloadProgress(resp *grab.Response){
 	t := time.NewTicker(500 * time.Millisecond)
 	defer t.Stop()
@@ -75,48 +130,6 @@ Loop:
 			break Loop
 		}
 	}
-}
-
-func getTrackID(url string) string {
-	escapedURL := url2.QueryEscape(url)
-	apiURL := fmt.Sprintf("https://api.soundcloud.com/resolve.json?url=%s&client_id=%s", escapedURL, CLIENT_ID)
-	resp, err := http.Get(apiURL)
-	handleError(err)
-	body, err := ioutil.ReadAll(resp.Body)
-	handleError(err)
-
-	var response map[string]interface{}
-	err = json.Unmarshal([]byte(body), &response)
-	handleError(err)
-
-	// convert id (float64) to string
-	return fmt.Sprintf("%.f", response["id"].(float64))
-}
-
-func getTrackURL(trackId string) string {
-	// create url
-	url := fmt.Sprintf("https://api.soundcloud.com/i1/tracks/%s/streams/?client_id=%s&app_version=%s", trackId, CLIENT_ID, APP_VERSION)
-
-	// make request
-	resp, err := http.Get(url)
-	handleError(err)
-	body, err := ioutil.ReadAll(resp.Body)
-	handleError(err)
-
-	// convert response body to map
-	var response map[string]interface{}
-	err = json.Unmarshal([]byte(body), &response)
-	handleError(err)
-
-	return response[TRACK_URL_KEY].(string)
-}
-
-func downloadFileFrom(url string) (*grab.Response, error) {
-	client := grab.NewClient()
-	req, err := grab.NewRequest("output.mp3", url)
-
-	resp := client.Do(req)
-	return resp, err
 }
 
 func saveFile(data io.ReadCloser, fileName string){
