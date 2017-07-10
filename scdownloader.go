@@ -8,10 +8,10 @@ import (
 	"os"
 	"encoding/json"
 	url2 "net/url"
-	//"github.com/AlexJuca/soundcloud-go"
-	//"github.com/mikkyang/id3-go"
+	"github.com/mikkyang/id3-go"
 	"github.com/cavaliercoder/grab"
 	"time"
+	"github.com/AlexJuca/soundcloud-go"
 )
 
 const CLIENT_ID = "175c043157ffae2c6d5fed16c3d95a4c"
@@ -60,6 +60,10 @@ func downloadFromSoundCloud(url string){
 		os.Exit(1)
 	}
 	fmt.Println("Download finished!")
+
+	fmt.Println("Tagging file...")
+	tagFile(trackID, "output.mp3")
+	fmt.Println("Tagging finished!")
 }
 
 func getTrackID(url string) string {
@@ -73,7 +77,7 @@ func getTrackID(url string) string {
 	body, err := ioutil.ReadAll(resp.Body)
 	handleError(err)
 
-	fmt.Printf(string(body))
+	fmt.Println(string(body))
 
 	if len(body) == 0 {
 		panic("Length of JSON is 0\n")
@@ -141,20 +145,43 @@ func saveFile(data io.ReadCloser, fileName string){
 	handleError(err)
 }
 
-//func tagFile(trackID string, fileName string){
-//	// get track info
-//	client := soundclient.SoundCloud{ClientId: CLIENT_ID, ClientSecret: SECRET_KEY}
-//	song := client.Tracks(trackID)
-//
-//	file, err := id3.Open(fileName)
-//	handleError(err)
-//	defer file.Close()
-//
-//	title, ok := song.GetString("title")
-//	if ok == nil {
-//		fmt.Println(title)
-//	}
-//}
+func tagFile(trackID string, fileName string){
+	// get track info
+	client := soundclient.SoundCloud{ClientId: CLIENT_ID, ClientSecret: SECRET_KEY}
+	song := client.Tracks(trackID)
+
+	file, err := id3.Open(fileName)
+	handleError(err)
+	defer file.Close()
+
+	title, ok := song.GetString("title")
+	if ok == nil {
+		file.SetTitle(title)
+	}
+
+	user, ok := song.GetObject("user")
+	if ok == nil {
+		artist, ok := user.GetString("username")
+		if ok == nil {
+			file.SetArtist(artist)
+		}
+	}
+
+	year, ok := song.GetString("release_year")
+	if ok == nil {
+		file.SetYear(year)
+	} else {	// if release year is nil, use created_at, which is in the format YYYY/MM/DD
+		year, ok = song.GetString("created_at")
+		if ok == nil {
+			file.SetYear(year[0:4])
+		}
+	}
+
+	genre, ok := song.GetString("genre")
+	if ok == nil {
+		file.SetGenre(genre)
+	}
+}
 
 func handleError(err error){
 	if err != nil {
